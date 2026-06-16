@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>교실 칠판 룰렛 추첨기</title>
+    <style>
+        /* 칠판 느낌의 짙은 녹색 배경 */
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #1e3f20;
+            background-image: radial-gradient(#2d5a30 15%, transparent 20%),
+                              radial-gradient(#1a381c 15%, transparent 20%);
+            background-size: 4px 4px;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            color: #f7d070;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 5px;
+            font-size: 2.2rem;
+        }
+
+        /* 구독 좋아요 알림설정 영역 */
+        .notice-text {
+            font-size: 1.1rem;
+            color: #ff7675;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 5px 15px;
+            border-radius: 15px;
+            border: 1px dashed #ff7675;
+        }
+
+        /* 컨트롤러 영역 (명단 랜덤 배정) */
+        .control-panel {
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .action-btn {
+            background-color: #f1c40f;
+            color: #2c3e50;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+            margin: 0 5px;
+        }
+
+        .action-btn:hover {
+            background-color: #f39c12;
+        }
+
+        .action-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px rgba(0,0,0,0.3);
+        }
+
+        /* 룰렛 컨테이너 및 화살표 */
+        .roulette-container {
+            position: relative;
+            width: 420px;
+            height: 420px;
+            margin-bottom: 30px;
+        }
+
+        .arrow {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-top: 35px solid #ff4757;
+            z-index: 10;
+            filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.3));
+        }
+
+        /* 캔버스 스타일 (분필 가루 느낌의 테두리) */
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 8px solid #ffffff;
+            box-shadow: 0 12px 25px rgba(0,0,0,0.4);
+            transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
+            background-color: white;
+        }
+
+        /* 돌리기 버튼 */
+        .spin-btn {
+            background: linear-gradient(135deg, #ff4757, #ff6b81);
+            color: white;
+            border: 2px solid #ffffff;
+            padding: 15px 50px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .spin-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .spin-btn:disabled {
+            background: #7f8c8d;
+            border-color: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* 결과 팝업 창 */
+        .result-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ffffff;
+            color: #333333;
+            padding: 35px 60px;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            text-align: center;
+            z-index: 30;
+            border: 4px solid #f1c40f;
+        }
+
+        .result-modal h2 {
+            margin: 0 0 20px 0;
+            color: #1e3f20;
+            font-size: 2rem;
+        }
+
+        .result-modal button {
+            background-color: #1e3f20;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        /* 빵빠레(폭죽) 파티클 스타일 */
+        .confetti {
+            position: fixed;
+            width: 12px;
+            height: 12px;
+            background-color: #f00;
+            border-radius: 50%;
+            z-index: 20;
+            pointer-events: none;
+            animation: fire 1.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fire {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--x), var(--y)) scale(0.5);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎯 칠판 룰렛 무작위 추첨기</h1>
+    <div class="notice-text">📢 구독 좋아요 알림 설정 필수!</div>
+
+    <div class="control-panel">
+        <button class="action-btn" onclick="generateRandomStudents()">학생 명단 랜덤 배정 (10명)</button>
+    </div>
+
+    <div class="roulette-container">
+        <div class="arrow"></div>
+        <canvas id="rouletteCanvas" width="800" height="800"></canvas>
+    </div>
+
+    <button class="spin-btn" id="spinBtn" onclick="spinRoulette()">룰렛 돌리기</button>
+
+    <div class="result-modal" id="resultModal">
+        <h2 id="winnerName">🎉 당첨자 🎉</h2>
+        <button onclick="closeModal()">확인</button>
+    </div>
+
+    <script>
+        // 기본 90명 풀에서 무작위로 10명을 뽑기 위한 이름 샘플 데이터
+        const namePool = [
+            "강민준", "김서연", "이도윤", "박지우", "최우진", "정하윤", "윤서준", "한채원", "임현우", "오지민",
+            "신준우", "서은서", "황민재", "안지아", "송건우", "전하은", "홍시우", "양유진", "고재현", "문소율",
+            "배진우", "백서진", "유도현", "남민서", "노준혁", "하은지", "곽태양", "성민아", "차동현", "심예은"
+        ];
+
+        // 현재 룰렛에 배정된 학생 목록 (초기 기본값)
+        let currentStudents = ["김철수", "이영희", "박민수", "최지우", "정다은", "강하늘", "윤서준", "한소희", "홍길동", "임꺽정"];
+        
+        const canvas = document.getElementById("rouletteCanvas");
+        const ctx = canvas.getContext("2d");
+        const spinBtn = document.getElementById("spinBtn");
+        const resultModal = document.getElementById("resultModal");
+        const winnerName = document.getElementById("winnerName");
+
+        // 칠판 배경에 어울리는 파스텔톤/비비드 룰렛 색상 배치
+        const colors = ["#ff7675", "#74b9ff", "#55efc4", "#ffeaa7", "#a29bfe", "#fd79a8", "#fab1a0", "#00cec9", "#e84393", "#6c5ce7"];
+        
+        let currentRotation = 0;
+
+        // 1. 학생 명단 랜덤 배정 기능 (풀에서 무작위 10명 선택)
+        function generateRandomStudents() {
+            if(spinBtn.disabled) return; // 돌고 있을 때는 작동 방지
+            
+            // 배열 무작위 셔플 후 10명 추출
+            const shuffled = [...namePool].sort(() => 0.5 - Math.random());
+            currentStudents = shuffled.slice(0, 10);
+            
+            // 원판 새로 그리기
+            drawRoulette();
+        }
+
+        // 룰렛 시각화 함수
+        function drawRoulette() {
+            const numSegments = currentStudents.length;
+            const segmentAngle = (2 * Math.PI) / numSegments;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.font = "bold 26px 'Noto Sans KR'";
+
+            for (let i = 0; i < numSegments; i++) {
+                const angle = i * segmentAngle;
+                
+                // 부채꼴 구역 그리기
+                ctx.beginPath();
+                ctx.moveTo(400, 400);
+                ctx.arc(400, 400, 390, angle, angle + segmentAngle);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#ffffff";
+                ctx.stroke();
+
+                // 학생 이름 텍스트 배치
+                ctx.save();
+                ctx.translate(400, 400);
+                ctx.rotate(angle + segmentAngle / 2);
+                ctx.fillStyle = "#2c3e50"; // 가독성 좋은 어두운 색상 텍스트
+                ctx.fillText(currentStudents[i], 240, 0);
+                ctx.restore();
+            }
+
+            // 정중앙을 잡아주는 흰색 배꼽 원
+            ctx.beginPath();
+            ctx.arc(400, 400, 40, 0, 2 * Math.PI);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        // 2. 룰렛 회전 및 애니메이션 로직
+        function spinRoulette() {
+            spinBtn.disabled = true;
+            
+            const numSegments = currentStudents.length;
+            const addedRotation = (Math.floor(Math.random() * 5) + 6) * 360 + Math.floor(Math.random() * 360);
+            currentRotation += addedRotation;
+            
+            // 4초 동안 서서히 멈추는 애니메이션 적용
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+            // [추가 조건] 멈추기 직전(3.6초 시점)에 빵빠레 효과 작동 개시
+            setTimeout(() => {
+                createConfettiBurst();
+            }, 3600);
+
+            // 4초 완료 시점에 정확한 당첨자 판정 및 모달 팝업
+            setTimeout(() => {
+                const actualDegrees = currentRotation % 360;
+                const index = Math.floor((360 - actualDegrees + 270) % 360 / (360 / numSegments));
+                
+                winnerName.innerText = `🎉 ${currentStudents[index]} 학생 당첨! 🎉`;
+                resultModal.style.display = "block";
+            }, 4000);
+        }
+
+        // 3. 빵빠레(폭죽 크래커) 애니메이션 함수
+        function createConfettiBurst() {
+            const colorsPool = ['#ff4757', '#2ed573', '#1e90ff', '#ffa502', '#ea2027', '#ee5253', '#00f5d4'];
+            const burstCount = 100; // 파티클 개수
+
+            for (let i = 0; i < burstCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                
+                // 화면 중앙 부근(룰렛 뒤쪽 포지션)에서 시작
+                confetti.style.left = '50%';
+                confetti.style.top = '45%';
+                
+                // 랜덤한 방향 벡터 설정 (사방으로 뻗어나가도록 계산)
+                const angle = Math.random() * Math.PI * 2;
+                const distance = Math.floor(Math.random() * 300) + 150; // 날아갈 거리
+                const x = Math.cos(angle) * distance;
+                const y = Math.sin(angle) * distance;
+                
+                confetti.style.setProperty('--x', `${x}px`);
+                confetti.style.setProperty('--y', `${y}px`);
+                
+                // 무작위 색상 및 크기 부여
+                confetti.style.backgroundColor = colorsPool[Math.floor(Math.random() * colorsPool.length)];
+                confetti.style.width = `${Math.floor(Math.random() * 8) + 8}px`;
+                confetti.style.height = confetti.style.width;
+                
+                document.body.appendChild(confetti);
+                
+                // 애니메이션이 끝나면 DOM 요소 제거
+                confetti.addEventListener('animationend', () => {
+                    confetti.remove();
+                });
+            }
+        }
+
+        function closeModal() {
+            resultModal.style.display = "none";
+            spinBtn.disabled = false;
+        }
+
+        // 초기 화면 설정 실행
+        drawRoulette();
+    </script>
+</body>
+</html>
